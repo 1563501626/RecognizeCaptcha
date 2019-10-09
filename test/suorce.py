@@ -111,4 +111,7 @@ def minst_train():
 
 
 if __name__ == '__main__':
-    minst_train()
+    # minst_train()
+    import numpy as np
+
+    print(np.array([[1], [2], [3]]).flatten())
