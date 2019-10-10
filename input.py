@@ -6,7 +6,7 @@ import re
 
 class Input:
     def __init__(self, label_path, img_path, height, width, channels, batch_size, save_path, label_rule: list,
-                 criterion, decoding='utf8'):
+                 criterion, text_len, decoding='utf8'):
         self.label_path = [label_path]
         self.img_path = [os.path.join(img_path, str(x) + '.jpg') for x in range(10)]
         self.height = height
@@ -17,6 +17,7 @@ class Input:
         self.label_rule = label_rule
         self.decoding = decoding
         self.criterion = criterion
+        self.text_len = text_len
 
     def label_to_one_hot(self, labels):
         """
@@ -28,10 +29,10 @@ class Input:
         labels = np.array(labels).flatten()
         # bytes=>string
         labels = list(map(lambda x: x.decode(self.decoding), labels))
-        one_hot = np.zeros([self.batch_size, len(self.label_rule)])
+        one_hot = np.zeros([self.batch_size, self.text_len, len(self.label_rule)])
         for index, label in enumerate(labels):
-            for item in re.match(self.criterion, label).groups():
-                one_hot[index, self.label_rule.index(item)] = 1
+            for w, item in enumerate(re.match(self.criterion, label).groups()):
+                one_hot[index, w, self.label_rule.index(item)] = 1
         one_hot_batch = tf.convert_to_tensor(one_hot)
 
         return one_hot_batch
@@ -92,7 +93,9 @@ class Input:
             thread = tf.train.start_queue_runners(sess=sess, coord=coord)
 
             labels = sess.run(label_batch)
+            print(labels[0])
             labels_str = self.label_to_one_hot(labels)
+            print(labels_str.eval())
             # 写入文件
             print('正在写入文件...')
             self.write_to_file(labels_str, img_batch)
@@ -103,6 +106,6 @@ class Input:
 
 if __name__ == '__main__':
     rule = [str(i) for i in range(100)] + ['+', '-', '*', '/']
-    i = Input('./text', './image', 32, 90, 3, 3, './cifar.tfrecords', rule, r"(\d+)([\*\+-/]+)(\d+)")
+    i = Input('./text', './image', 32, 90, 3, 500, './cifar.tfrecords', rule, r"(\d+)([\*\+-/]+)(\d+)", 3)
     i.run()
     print('done!')
