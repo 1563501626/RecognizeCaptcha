@@ -35,6 +35,7 @@ class Test:
 
             x_relu1 = tf.nn.relu(tf.nn.conv2d(x, w1, strides=[1, 1, 1, 1], padding='SAME') + b1)  # [None, 28, 28, 1]=>[None, 28, 28, 32]
             x_pool1 = tf.nn.max_pool(x_relu1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')  # ksize池化窗口大小 [None, 14, 14, 32]
+            x_pool1 = tf.nn.dropout(x_pool1, 1)
 
         with tf.variable_scope('cv2'):
             w2 = self.weight_var([3, 3, 32, 64])
@@ -42,8 +43,7 @@ class Test:
 
             x_relu2 = tf.nn.relu(tf.nn.conv2d(x_pool1, w2, strides=[1, 1, 1, 1], padding='SAME') + b2)
             x_pool2 = tf.nn.max_pool(x_relu2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-            # output = tf.nn.max_pool(x_relu2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-            # output = tf.reshape(output, [-1, 7 * 7 * 64])
+            x_pool2 = tf.nn.dropout(x_pool2, 1)
 
         with tf.variable_scope('cv3'):
             w3 = self.weight_var([3, 3, 64, 128])
@@ -51,20 +51,23 @@ class Test:
 
             x_relu3 = tf.nn.relu(tf.nn.conv2d(x_pool2, w3, strides=[1, 1, 1, 1], padding='SAME') + b3)
             output = tf.nn.max_pool(x_relu3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+            output = tf.nn.dropout(output, 1)
             print(output)
             output = tf.reshape(output, [-1, 4 * 4 * 128])
 
         with tf.variable_scope("full_connection"):
-            w1 = tf.Variable(tf.random_normal([4 * 4 * 128, 256]))
-            b1 = tf.Variable(tf.zeros([256]))
+            w1 = self.weight_var([4 * 4 * 128, 1024])
+            b1 = self.weight_var([1024])
             y1 = tf.matmul(output, w1) + b1
             y1 = tf.nn.relu(y1)  # 降低线性关系
+            y1 = tf.nn.dropout(y1, 1)
             # w2 = tf.Variable(tf.random_normal([256, 128]))
             # b2 = tf.Variable(tf.zeros([128]))
             # y2 = tf.matmul(y1, w2) + b2
-            # y2 = tf.nn.softmax(y2)
-            w3 = tf.Variable(tf.random_normal([256, 10]))
-            b3 = tf.Variable(tf.zeros(10))
+            # y2 = tf.nn.relu(y2)
+            # y2 = tf.nn.dropout(y2, 0.75)
+            w3 = self.weight_var([1024, 10])
+            b3 = self.weight_var([10])
             y_predict = tf.matmul(y1, w3) + b3
 
         with tf.variable_scope("compute_loss"):
@@ -76,10 +79,10 @@ class Test:
             accuracy_op = tf.reduce_mean(tf.cast(equal_list, tf.float32))
         init_op = tf.global_variables_initializer()
 
-        return train_op, accuracy_op, init_op
+        return train_op, accuracy_op, init_op, b3, w3
 
     def run(self):
-        model, accuracy, init = self.model()
+        model, accuracy, init, b, w = self.model()
         with tf.Session() as sess:
             sess.run(init)
             for i in range(self.steps):
@@ -89,7 +92,7 @@ class Test:
                     print("第%s次训练，准确率为：%s" % (
                         i,
                         sess.run(accuracy, feed_dict={self.X: train_x, self.Y: train_y})
-                    ))
+                    ), 'w:', w.eval()[0][0], 'b:', b.eval()[0])
 
 
 if __name__ == '__main__':

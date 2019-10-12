@@ -6,9 +6,9 @@ import re
 
 class Input:
     def __init__(self, label_path, img_path, height, width, channels, batch_size, save_path, label_rule: list,
-                 criterion, text_len, decoding='utf8'):
+                 criterion, captcha_len, decoding='utf8'):
         self.label_path = [label_path]
-        self.img_path = [os.path.join(img_path, str(x) + '.jpg') for x in range(10)]
+        self.img_path = [os.path.join(img_path, str(x) + '.jpeg') for x in range(10)]
         self.height = height
         self.width = width
         self.channels = channels
@@ -17,9 +17,9 @@ class Input:
         self.label_rule = label_rule
         self.decoding = decoding
         self.criterion = criterion
-        self.text_len = text_len
+        self.captcha_len = captcha_len
 
-    def label_to_one_hot(self, labels):
+    def label_to_num(self, labels):
         """
         转换为one-hot编码
         :param labels: [[b"..."], [b"..."]]
@@ -29,13 +29,18 @@ class Input:
         labels = np.array(labels).flatten()
         # bytes=>string
         labels = list(map(lambda x: x.decode(self.decoding), labels))
-        one_hot = np.zeros([self.batch_size, self.text_len, len(self.label_rule)])
+        # one_hot = np.zeros([self.batch_size, self.captcha_len, len(self.label_rule)])
+        # for index, label in enumerate(labels):
+        #     for w, item in enumerate(re.match(self.criterion, label).groups()):
+        #         one_hot[index, w, self.label_rule.index(item)] = 1
+        # num_batch = tf.convert_to_tensor(one_hot)
+        array = np.zeros([self.batch_size, self.captcha_len])
         for index, label in enumerate(labels):
-            for w, item in enumerate(re.match(self.criterion, label).groups()):
-                one_hot[index, w, self.label_rule.index(item)] = 1
-        one_hot_batch = tf.convert_to_tensor(one_hot)
+            for i, v in enumerate(re.match(self.criterion, label).groups()):
+                array[index, i] = self.label_rule.index(v)
+        num_batch = tf.convert_to_tensor(array, dtype=tf.uint8)
 
-        return one_hot_batch
+        return num_batch
 
     def get_label_batch(self):
         # 创建文件队列
@@ -94,7 +99,7 @@ class Input:
 
             labels = sess.run(label_batch)
             print(labels[0])
-            labels_str = self.label_to_one_hot(labels)
+            labels_str = self.label_to_num(labels)
             print(labels_str.eval())
             # 写入文件
             print('正在写入文件...')
@@ -105,7 +110,7 @@ class Input:
 
 
 if __name__ == '__main__':
-    rule = [str(i) for i in range(100)] + ['+', '-', '*', '/']
-    i = Input('./text', './image', 32, 90, 3, 500, './cifar.tfrecords', rule, r"(\d+)([\*\+-/]+)(\d+)", 3)
+    rule = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+    i = Input('./test/text', './test/img', 30, 100, 3, 1000, './test/cifar.tfrecords', rule, r"(\w{1})(\w{1})(\w{1})(\w{1})", 4)
     i.run()
     print('done!')
